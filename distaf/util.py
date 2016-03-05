@@ -49,7 +49,7 @@ def inject_gluster_logs(label, servers=''):
         on during the test case
 
         @parameter: A label string which will be injected to gluster logs
-                    A list of servers in which this log inejection should be
+                    A list of servers in which this log injection should be
                     done
 
         @returns: None
@@ -58,7 +58,13 @@ def inject_gluster_logs(label, servers=''):
         servers = tc.all_nodes
     cmd = "for file in `find $(gluster --print-logdir) -type f " \
             "-name '*.log'`; do echo \"%s\" >> $file; done" % label
-    tc.run_servers(cmd, servers=servers, verbose=False)
+
+    if tc.use_ssh:
+        for server in servers:
+            tc.run(server, cmd)
+    else:
+        tc.run_servers(cmd, servers=servers, verbose=False)
+
     return None
 
 
@@ -69,7 +75,9 @@ def testcase(name):
         def wrapper(self):
             tc.logger.info("Starting the test: %s" % name)
             voltype, mount_proto = test_seq.pop(0)
-            inject_gluster_logs("%s_%s" % (voltype, name))
+
+            if not tc.skip_log_inject:
+                inject_gluster_logs("%s_%s" % (voltype, name))
             _ret = True
             globl_configs['reuse_setup'] = tc_config['reuse_setup']
             globl_configs.update(tc_config)
@@ -106,7 +114,8 @@ def testcase(name):
                     tc.logger.exception("Exception while running %s" % name)
                     _ret = False
             self.assertTrue(_ret, "Testcase %s failed" % name)
-            inject_gluster_logs("%s_%s" % (voltype, name))
+            if not tc.skip_log_inject:
+                inject_gluster_logs("%s_%s" % (voltype, name))
             tc.logger.info("Ending the test: %s" % name)
             return _ret
 
